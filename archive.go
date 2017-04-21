@@ -32,6 +32,8 @@ type tarFile struct {
 }
 
 var totalbytes int64
+var firstHpsstransferset bool
+var firstHpsstransfer time.Time
 var tarWaiter sync.WaitGroup
 var hpssWaiter sync.WaitGroup
 var hpsschannel chan string
@@ -88,18 +90,21 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 		// finish current archive first?
 		if currentsize != 0 && (currentsize+entry.file.Size() > maxsize) {
 			catalogfile.Close()
-			tarchannel <- tarFile{fmt.Sprintf(workdir+"/"+archive+"-%9.9d.tar", currentarchive), currentcatalogname, currentsize}
+			tarchannel <- tarFile{fmt.Sprintf(workdir+"/"+archive+"-%9.9d.tar",
+				currentarchive), currentcatalogname, currentsize}
 			// switch to next archive
 			currentarchive += 1
 			currentsize = 0
-			currentcatalogname = fmt.Sprintf(workdir+"/"+archive+"-%9.9d.cat", currentarchive)
+			currentcatalogname = fmt.Sprintf(workdir+"/"+archive+"-%9.9d.cat",
+				currentarchive)
 			catalogfile, err = os.Create(currentcatalogname)
 			if err != nil {
 				log.Println("could not open catalog file for writing!")
 				os.Exit(1)
 			}
 		}
-		fmt.Fprintf(fullcatalogfile, "%s|%d|%d\n", entry.path+"/"+entry.file.Name(), entry.file.Size(), currentarchive)
+		fmt.Fprintf(fullcatalogfile, "%s|%d|%d\n", entry.path+"/"+entry.file.Name(),
+			entry.file.Size(), currentarchive)
 		fmt.Fprintln(catalogfile, entry.path+"/"+entry.file.Name())
 		currentsize += entry.file.Size()
 		totalbytes += entry.file.Size()
@@ -107,7 +112,8 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 
 	// write last files
 	catalogfile.Close()
-	tarchannel <- tarFile{fmt.Sprintf(workdir+"/"+archive+"-%9.9d.tar", currentarchive), currentcatalogname, currentsize}
+	tarchannel <- tarFile{fmt.Sprintf(workdir+"/"+archive+"-%9.9d.tar", currentarchive),
+		currentcatalogname, currentsize}
 
 	// close catalogue and send to hpss
 	fullcatalogfile.Close()
@@ -121,12 +127,14 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 	tarWaiter.Add(1)
 	for tar := range tarchannel {
 		log.Print(" archiving into ", tar.tarfilename /*, " from ", tar.filelistname */)
-		out, err := exec.Command("/bin/tar", "--no-recursion", "-T", tar.filelistname, "-cf", tar.tarfilename).Output()
+		out, err := exec.Command("/bin/tar", "--no-recursion", "-T", tar.filelistname,
+			"-cf", tar.tarfilename).Output()
 		_ = out
 		if err != nil {
 			log.Fatal("error while writing "+tar.tarfilename, err)
 		}
-		log.Print(" finished archiving into ", tar.tarfilename, "  ", tar.size/(1024*1024), " MB")
+		log.Print(" finished archiving into ", tar.tarfilename, "  ",
+			"(", tar.size/(1024*1024), " MB)")
 		hpsschannel <- tar.tarfilename
 	}
 	tarWaiter.Done()
@@ -135,8 +143,13 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 func hpssHandler(hpsschannel chan string) {
 	hpssWaiter.Add(1)
 	for tarfile := range hpsschannel {
+		if !firstHpsstransferset {
+			firstHpsstransfer = time.Now()
+			firstHpsstransferset = true
+		}
 		log.Print("  sending to hpss ", tarfile)
-		cmd := exec.Command(config.Pftp_client, "-w", "4", "-inv", config.Hpssserver, strconv.Itoa(config.Hpssport))
+		cmd := exec.Command(config.Pftp_client, "-w4", "-inv",
+			config.Hpssserver, strconv.Itoa(config.Hpssport))
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
 			log.Fatal("error calling pftp_client", err)
@@ -187,5 +200,5 @@ func archive(archivename string, directory string, maxsize int) {
 	hpssWaiter.Wait()
 	log.Print("finished waiting for hpss")
 	log.Print("time for hpss: ", time.Since(start))
-	log.Print("BW for hpss: ", float64(totalbytes)/(1024.0*1024.0)/time.Since(start).Seconds(), " MB/s")
+	log.Print("BW for hpss: ", float64(totalbytes)/(1024.0*1024.0)/time.Since(firstHpsstransfer).Seconds(), " MB/s")
 }
