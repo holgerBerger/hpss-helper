@@ -295,6 +295,6 @@ func archive(archivename string, directory string, maxsize int) {
 	log.Print("waiting for hpss")
 	hpssWaiter.Wait()
 	log.Print("finished waiting for hpss")
-	log.Print("time for hpss: ", time.Since(start))
+	log.Print("time for hpss: ", time.Since(firstHpsstransfer))
 	log.Print("BW for hpss: ", float64(totalbytes)/(1024.0*1024.0)/time.Since(firstHpsstransfer).Seconds(), " MB/s")
 }
