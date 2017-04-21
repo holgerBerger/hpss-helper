@@ -191,6 +191,7 @@ func hpssHandler2(hpsschannel chan string) {
 			}
 		}
 		ch <- true
+		// TODO collect output and print error message if timeout is triggered
 	}()
 	select {
 	case <-ch:
