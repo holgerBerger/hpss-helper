@@ -6,6 +6,7 @@ package main
 */
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -77,7 +78,7 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 	// spawn hpps movers
 	hpsschannel = make(chan string, 1024)
 	for i := 1; i < config.Hpssmovers; i++ {
-		go hpssHandler(hpsschannel)
+		go hpssHandler2(hpsschannel)
 	}
 
 	// spawn tar processes
@@ -138,6 +139,68 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 		hpsschannel <- tar.tarfilename
 	}
 	tarWaiter.Done()
+}
+
+func hpssHandler2(hpsschannel chan string) {
+	// out := make([]byte, 8192)
+	hpssWaiter.Add(1)
+	cmd := exec.Command(config.Pftp_client, "-w4", "-inv",
+		config.Hpssserver, strconv.Itoa(config.Hpssport))
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatal("error calling pftp_client", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	bstdout := bufio.NewReader(stdout)
+
+	cmd.Start()
+
+	io.WriteString(stdin, "quote USER "+config.Hpssusername+"\n")
+	io.WriteString(stdin, "quote pass "+config.Hpsspassword+"\n")
+	io.WriteString(stdin, "cd "+config.Hpssbasedir+"\n")
+
+	for {
+		// FIXME timeout needed, in case login fails
+		out, _ := bstdout.ReadBytes('\n')
+		if strings.Index(string(out), "250 CWD") != -1 {
+			break
+		}
+	}
+
+	for tarfile := range hpsschannel {
+		if !firstHpsstransferset {
+			firstHpsstransfer = time.Now()
+			firstHpsstransferset = true
+		}
+		log.Print("  sending to hpss ", tarfile)
+
+		stdin.Write([]byte("put " + tarfile + " " + path.Base(tarfile) + "\n"))
+		stdin.Write([]byte("\n"))
+
+		for {
+			time.Sleep(500 * time.Millisecond)
+			fmt.Println("...waiting...")
+			out, err := bstdout.ReadBytes('\n')
+			if err != nil {
+				fmt.Printf("%s\n", out)
+				log.Fatal(err)
+			}
+			fmt.Printf("[%s]", out)
+			if strings.Index(string(out), "226 Transfer ") != -1 {
+				break
+			}
+			if strings.Index(string(out), "HPSS Error:") != -1 {
+				log.Fatal("error in transfer of ", tarfile)
+				break
+			}
+		}
+		log.Print("  finished sending to hpss ", tarfile)
+	}
+
+	io.WriteString(stdin, "bye\n")
+	cmd.Wait()
+
+	hpssWaiter.Done()
 }
 
 func hpssHandler(hpsschannel chan string) {
