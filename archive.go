@@ -141,10 +141,27 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 	tarWaiter.Done()
 }
 
+// read with timeout
+func TORead(reader *bufio.Reader, to time.Duration) (out []byte) {
+	ch := make(chan bool)
+	out = []byte("")
+	go func() {
+		out, _ = reader.ReadBytes('\n')
+		ch <- true
+	}()
+	select {
+	case <-ch:
+		return
+	case <-time.After(to):
+		return nil
+	}
+	return
+}
+
 func hpssHandler2(hpsschannel chan string) {
 	// out := make([]byte, 8192)
 	hpssWaiter.Add(1)
-	cmd := exec.Command(config.Pftp_client, "-w4", "-inv",
+	cmd := exec.Command(config.Pftp_client, "-w2", "-inv",
 		config.Hpssserver, strconv.Itoa(config.Hpssport))
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -159,12 +176,28 @@ func hpssHandler2(hpsschannel chan string) {
 	io.WriteString(stdin, "quote pass "+config.Hpsspassword+"\n")
 	io.WriteString(stdin, "cd "+config.Hpssbasedir+"\n")
 
-	for {
-		// FIXME timeout needed, in case login fails
-		out, _ := bstdout.ReadBytes('\n')
-		if strings.Index(string(out), "250 CWD") != -1 {
-			break
+	// this is a timeout hack
+	ch := make(chan bool)
+	go func() {
+		for {
+			time.Sleep(100 * time.Millisecond)
+			out, _ := bstdout.ReadBytes('\n')
+			if out == nil {
+				log.Fatal("error in hpss login!")
+				return
+			}
+			if strings.Index(string(out), "250 CWD") != -1 {
+				break
+			}
 		}
+		ch <- true
+	}()
+	select {
+	case <-ch:
+		log.Println("  hpss login and cd succesfull")
+	case <-time.After(10 * time.Second):
+		log.Fatal("error in hpss login!")
+		os.Exit(1)
 	}
 
 	for tarfile := range hpsschannel {
@@ -178,14 +211,14 @@ func hpssHandler2(hpsschannel chan string) {
 		stdin.Write([]byte("\n"))
 
 		for {
-			time.Sleep(500 * time.Millisecond)
-			fmt.Println("...waiting...")
+			time.Sleep(100 * time.Millisecond)
+			// fmt.Println("...waiting...")
 			out, err := bstdout.ReadBytes('\n')
 			if err != nil {
 				fmt.Printf("%s\n", out)
 				log.Fatal(err)
 			}
-			fmt.Printf("[%s]", out)
+			// fmt.Printf("[%s]", out)
 			if strings.Index(string(out), "226 Transfer ") != -1 {
 				break
 			}
@@ -211,7 +244,7 @@ func hpssHandler(hpsschannel chan string) {
 			firstHpsstransferset = true
 		}
 		log.Print("  sending to hpss ", tarfile)
-		cmd := exec.Command(config.Pftp_client, "-w4", "-inv",
+		cmd := exec.Command(config.Pftp_client, "-w2", "-inv",
 			config.Hpssserver, strconv.Itoa(config.Hpssport))
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
