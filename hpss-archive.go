@@ -18,9 +18,16 @@ func main() {
 	args, err := flags.Parse(&opts)
 	_ = err
 
-	if _, err := toml.DecodeFile(os.ExpandEnv("${HOME}/.hpps-archive.conf"), &config); err != nil {
-		log.Print("error in reading ${HOME}/.hpps-archive.conf")
+	// read config
+	if _, err := toml.DecodeFile(os.ExpandEnv("${HOME}/.hpss-archive.conf"), &config); err != nil {
+		log.Print("error in reading ${HOME}/.hpss-archive.conf")
 		log.Fatal(err)
+	}
+
+	// check if cache dir exists
+	if _, err := os.Stat(os.ExpandEnv(config.Cachedir)); os.IsNotExist(err) {
+		log.Print("Cachdir ", os.ExpandEnv(config.Cachedir), " does not exist!")
+		os.Exit(1)
 	}
 
 	if opts.Archive {
