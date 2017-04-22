@@ -8,9 +8,11 @@ import (
 )
 
 var opts struct {
-	Archive bool `long:"archive" short:"a" description:"archive directory"`
-	Maxsize int  `long:"maxsize" short:"s" default:"1" description:"maximum size of fragment in HPSS in GB"`
-	Verbose bool `long:"verbose" short:"v" description:"show more output"`
+	Archive      bool `long:"archive" short:"a" description:"archive directory, -a NAME DIR"`
+	ListArchives bool `long:"listarchives" short:"L" description:"list existing archives"`
+	ListFiles    bool `long:"listfiles" short:"l" description:"list files in archive, -l NAME"`
+	Maxsize      int  `long:"maxsize" short:"s" default:"1" description:"maximum size of fragment in HPSS in GB"`
+	Verbose      bool `long:"verbose" short:"v" description:"show more output"`
 }
 
 var config configT
@@ -33,7 +35,7 @@ func main() {
 
 	if opts.Verbose {
 		log.Println("Cachedir (metadata cache): ", os.ExpandEnv(config.General.Cachedir))
-		log.Println("Workdir (place for temporary files): ", os.ExpandEnv(config.General.Workdir))
+		log.Println("Workdir (temporary files): ", os.ExpandEnv(config.General.Workdir))
 	}
 
 	if opts.Archive {
@@ -44,6 +46,11 @@ func main() {
 		archivename := args[0]
 		directory := args[1]
 		archive(archivename, directory, opts.Maxsize)
+	} else if opts.ListArchives {
+		listarchives()
+	} else if opts.ListFiles {
+		listfiles(args[0])
+	} else {
+		log.Println("try hpss-archive -h for help")
 	}
-
 }
