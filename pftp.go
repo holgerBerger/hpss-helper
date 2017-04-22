@@ -30,7 +30,8 @@ func NewPftp(hpssconfig HpssConfigT) *Pftp {
 	if pftp.hpssconfig.Hpsswidth == 0 {
 		pftp.hpssconfig.Hpsswidth = 1
 	}
-	pftp.cmd = exec.Command(pftp.hpssconfig.Pftp_client, "-w"+strconv.Itoa(pftp.hpssconfig.Hpsswidth), "-inv",
+	pftp.cmd = exec.Command(pftp.hpssconfig.Pftp_client,
+		"-w"+strconv.Itoa(pftp.hpssconfig.Hpsswidth), "-inv",
 		pftp.hpssconfig.Hpssserver, strconv.Itoa(pftp.hpssconfig.Hpssport))
 	pftp.stdin, err = pftp.cmd.StdinPipe()
 	if err != nil {

@@ -4,15 +4,17 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
 
-func listfiles(archive string) {
+func listfiles(archive, pattern string) {
+	patternmatch := pattern != ""
+	archiveset := make(map[string]bool)
 	file, err := os.Open(config.General.Cachedir + "/" + archive + ".full")
 	if err == nil {
 		bfile := bufio.NewReader(file)
-		archives := int64(0)
 		files := 0
 		bytes := int64(0)
 		for {
@@ -21,16 +23,24 @@ func listfiles(archive string) {
 				break
 			}
 			fields := strings.Split(string(line), "|")
-			fmt.Printf("%s   (%s bytes)\n", fields[0], fields[1])
-			curbytes, _ := strconv.ParseInt(fields[1], 10, 64)
-			curarchive, _ := strconv.ParseInt(strings.TrimSpace(fields[2]), 10, 32)
-			if curarchive > archives {
-				archives = curarchive
+			var ok bool
+			if patternmatch {
+				ok, err = path.Match(pattern, path.Base(fields[0]))
+				// fmt.Println("match", path.Base(fields[0]), pattern, ok, err)
+			} else {
+				ok = true
+				err = nil
 			}
-			bytes += curbytes
-			files++
+			if ok && err == nil {
+				fmt.Printf("%s   (%s bytes)\n", fields[0], fields[1])
+				curbytes, _ := strconv.ParseInt(fields[1], 10, 64)
+				archiveset[strings.TrimSpace(fields[2])] = true
+				bytes += curbytes
+				files++
+			}
 		}
-		fmt.Println("\n", bytes/(1204*1024), "MB in", files, "files kept in total of", archives, "archive fragments")
+		fmt.Println("\n", bytes/(1204*1024), "MB in", files,
+			"files kept in total of", len(archiveset), "archive fragments")
 		file.Close()
 	} else {
 		file, err := os.Open(config.General.Cachedir + "/" + archive + ".full-offline")

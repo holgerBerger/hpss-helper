@@ -10,7 +10,7 @@ import (
 var opts struct {
 	Archive      bool `long:"archive" short:"a" description:"archive directory, -a NAME DIR"`
 	ListArchives bool `long:"listarchives" short:"L" description:"list existing archives"`
-	ListFiles    bool `long:"listfiles" short:"l" description:"list files in archive, -l NAME"`
+	ListFiles    bool `long:"listfiles" short:"l" description:"list files in archive, -l NAME [PATTERN]"`
 	Maxsize      int  `long:"maxsize" short:"s" default:"1" description:"maximum size of fragment in HPSS in GB"`
 	Verbose      bool `long:"verbose" short:"v" description:"show more output"`
 }
@@ -49,7 +49,11 @@ func main() {
 	} else if opts.ListArchives {
 		listarchives()
 	} else if opts.ListFiles {
-		listfiles(args[0])
+		if len(args) > 1 {
+			listfiles(args[0], args[1])
+		} else {
+			listfiles(args[0], "")
+		}
 	} else {
 		log.Println("try hpss-archive -h for help")
 	}
