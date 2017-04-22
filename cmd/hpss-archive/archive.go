@@ -6,15 +6,16 @@ package main
 */
 
 import (
-	"bufio"
+	//	"bufio"
 	"fmt"
-	"io"
+	"github.com/holgerBerger/hpsshelper"
+	//	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
-	"strings"
+	//	"strconv"
+	//	"strings"
 	"sync"
 	"time"
 )
@@ -78,7 +79,7 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 	// spawn hpps movers
 	hpsschannel = make(chan string, 1024)
 	for i := 1; i < config.General.Hpssmovers; i++ {
-		go hpssHandler2(hpsschannel)
+		go hpssHandler(hpsschannel)
 	}
 
 	// spawn tar processes
@@ -141,6 +142,47 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 	tarWaiter.Done()
 }
 
+// hpssHandler uses pftp class for communication, latest version
+// one session is used for all transfers
+func hpssHandler(hpsschannel chan string) {
+	hpssWaiter.Add(1)
+
+	pftp := hpsshelper.NewPftp(config.Hpss)
+	if pftp == nil {
+		log.Fatal("error in init")
+	}
+
+	err := pftp.Cd(config.Hpss.Hpssbasedir)
+	if err != nil {
+		log.Fatal("error in cd")
+	}
+
+	for tarfile := range hpsschannel {
+		if !firstHpsstransferset {
+			firstHpsstransfer = time.Now()
+			firstHpsstransferset = true
+		}
+		log.Print("  sending to hpss ", tarfile)
+
+		err := pftp.Put(tarfile, path.Base(tarfile))
+		if err != nil {
+			log.Fatal("error in put for ", tarfile)
+			log.Fatal("FTP protocoll -----------------------")
+			log.Fatal(pftp.Protocoll.String())
+			log.Fatal("FTP protocoll end -------------------")
+		}
+
+		log.Print("  finished sending to hpss ", tarfile)
+	}
+
+	pftp.Bye()
+
+	hpssWaiter.Done()
+}
+
+// some unused, old code
+
+/*
 // better hpss handler, logs in once, pushes several files within one session
 func hpssHandler2(hpsschannel chan string) {
 	// out := make([]byte, 8192)
@@ -222,7 +264,7 @@ func hpssHandler2(hpsschannel chan string) {
 }
 
 // simple hpss handler, does complete session for each transfer, robust
-func hpssHandler(hpsschannel chan string) {
+func hpssHandler1(hpsschannel chan string) {
 	hpssWaiter.Add(1)
 	for tarfile := range hpsschannel {
 		if !firstHpsstransferset {
@@ -259,6 +301,7 @@ func hpssHandler(hpsschannel chan string) {
 	}
 	hpssWaiter.Done()
 }
+*/
 
 // archive a directory tree into a number of archives
 func archive(archivename string, directory string, maxsize int) {

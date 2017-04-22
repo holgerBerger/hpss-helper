@@ -1,0 +1,21 @@
+# example for $HOME/.hpsshelper.conf
+# This is TOML syntax
+
+[general]
+        workdir = "/tmp"			# place where  temporary tar achives are created, 
+						# has to be fast and have enough space
+        cachedir = "${HOME}/hpps-archive-cache" # metadata (=index) caching directory, ${HOME} gets expanded
+						# ~ is not expanded!
+        tars = 8				# number of parallel tar instances, more can hide latency
+						# but if there is not enough or too small files, more does not help
+        hpssmovers = 8				# number of parallel running pftp_clients to run
+[hpss]
+        hpssbasedir = "archive-tests"		# prefix directory for all files on HPSS
+        hpssserver = "hpsscore"			# name of HPSS core server
+        hpssport = 4021				# TCP port of FTP Server
+        hpssusername = "JohnDoe"		# username for HPSS
+        hpsspassword = "******"			# password for HPSS
+	hpsswidth = 4				# -wX parameter of pftp_client
+        pftp_client = "/usr/bin/pftp_client"	# path to pftp_client
+
+

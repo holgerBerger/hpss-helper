@@ -7,4 +7,5 @@ type HpssConfigT struct {
 	Hpssport     int    // TCP port of hpss server
 	Hpssusername string // username
 	Hpsspassword string // password !! DAMN HPSS
+	Hpsswidth    int    // numer of parallel conncections, -wX
 }

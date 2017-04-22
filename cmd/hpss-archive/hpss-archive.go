@@ -20,19 +20,19 @@ func main() {
 	_ = err
 
 	// read config
-	if _, err := toml.DecodeFile(os.ExpandEnv("${HOME}/.hpss-archive.conf"), &config); err != nil {
-		log.Print("error in reading $HOME/.hpss-archive.conf")
+	if _, err := toml.DecodeFile(os.ExpandEnv("${HOME}/.hpsshelper.conf"), &config); err != nil {
+		log.Print("error in reading $HOME/.hpsshelper.conf")
 		log.Fatal(err)
 	}
 
 	// check if cache dir exists
 	if _, err := os.Stat(os.ExpandEnv(config.General.Cachedir)); os.IsNotExist(err) {
-		log.Print("Cachdir ", os.ExpandEnv(config.General.Cachedir), " does not exist!")
+		log.Print("Cachedir ", os.ExpandEnv(config.General.Cachedir), " does not exist!")
 		os.Exit(1)
 	}
 
 	if opts.Verbose {
-		log.Println("Cachdir (metadata cache): ", os.ExpandEnv(config.General.Cachedir))
+		log.Println("Cachedir (metadata cache): ", os.ExpandEnv(config.General.Cachedir))
 		log.Println("Workdir (place for temporary files): ", os.ExpandEnv(config.General.Workdir))
 	}
 
