@@ -55,13 +55,13 @@ func walk(dir string, process chan dirEntry) {
 }
 
 // handler reads file from channel and puts them in file lists,
-// and pushes the file lists further down the pipe intp tar achive and hpss
+// and pushes the file lists further down the pipe into tar achive and hpss
 // maxsize is in bytes here!
 func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 	currentsize := int64(0)
 	currentarchive := 0
-	cachedir := os.ExpandEnv(config.Cachedir)
-	workdir := os.ExpandEnv(config.Workdir)
+	cachedir := os.ExpandEnv(config.General.Cachedir)
+	workdir := os.ExpandEnv(config.General.Workdir)
 
 	fullcatalogfile, err := os.Create(cachedir + "/" + archive + ".full")
 	if err != nil {
@@ -77,13 +77,13 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 
 	// spawn hpps movers
 	hpsschannel = make(chan string, 1024)
-	for i := 1; i < config.Hpssmovers; i++ {
+	for i := 1; i < config.General.Hpssmovers; i++ {
 		go hpssHandler2(hpsschannel)
 	}
 
 	// spawn tar processes
 	tarchannel := make(chan tarFile, 1024)
-	for i := 1; i < config.Tars; i++ {
+	for i := 1; i < config.General.Tars; i++ {
 		go tarHandler(tarchannel, hpsschannel)
 	}
 
@@ -141,28 +141,12 @@ func tarHandler(tarchannel chan tarFile, hpsschannel chan string) {
 	tarWaiter.Done()
 }
 
-// read with timeout
-func TORead(reader *bufio.Reader, to time.Duration) (out []byte) {
-	ch := make(chan bool)
-	out = []byte("")
-	go func() {
-		out, _ = reader.ReadBytes('\n')
-		ch <- true
-	}()
-	select {
-	case <-ch:
-		return
-	case <-time.After(to):
-		return nil
-	}
-	return
-}
-
+// better hpss handler, logs in once, pushes several files within one session
 func hpssHandler2(hpsschannel chan string) {
 	// out := make([]byte, 8192)
 	hpssWaiter.Add(1)
-	cmd := exec.Command(config.Pftp_client, "-w2", "-inv",
-		config.Hpssserver, strconv.Itoa(config.Hpssport))
+	cmd := exec.Command(config.Hpss.Pftp_client, "-w2", "-inv",
+		config.Hpss.Hpssserver, strconv.Itoa(config.Hpss.Hpssport))
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		log.Fatal("error calling pftp_client", err)
@@ -172,9 +156,9 @@ func hpssHandler2(hpsschannel chan string) {
 
 	cmd.Start()
 
-	io.WriteString(stdin, "quote USER "+config.Hpssusername+"\n")
-	io.WriteString(stdin, "quote pass "+config.Hpsspassword+"\n")
-	io.WriteString(stdin, "cd "+config.Hpssbasedir+"\n")
+	io.WriteString(stdin, "quote USER "+config.Hpss.Hpssusername+"\n")
+	io.WriteString(stdin, "quote pass "+config.Hpss.Hpsspassword+"\n")
+	io.WriteString(stdin, "cd "+config.Hpss.Hpssbasedir+"\n")
 
 	// this is a timeout hack
 	ch := make(chan bool)
@@ -237,6 +221,7 @@ func hpssHandler2(hpsschannel chan string) {
 	hpssWaiter.Done()
 }
 
+// simple hpss handler, does complete session for each transfer, robust
 func hpssHandler(hpsschannel chan string) {
 	hpssWaiter.Add(1)
 	for tarfile := range hpsschannel {
@@ -245,8 +230,8 @@ func hpssHandler(hpsschannel chan string) {
 			firstHpsstransferset = true
 		}
 		log.Print("  sending to hpss ", tarfile)
-		cmd := exec.Command(config.Pftp_client, "-w2", "-inv",
-			config.Hpssserver, strconv.Itoa(config.Hpssport))
+		cmd := exec.Command(config.Hpss.Pftp_client, "-w2", "-inv",
+			config.Hpss.Hpssserver, strconv.Itoa(config.Hpss.Hpssport))
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
 			log.Fatal("error calling pftp_client", err)
@@ -254,9 +239,9 @@ func hpssHandler(hpsschannel chan string) {
 
 		go func() {
 			defer stdin.Close()
-			io.WriteString(stdin, "quote USER "+config.Hpssusername+"\n")
-			io.WriteString(stdin, "quote pass "+config.Hpsspassword+"\n")
-			io.WriteString(stdin, "cd "+config.Hpssbasedir+"\n")
+			io.WriteString(stdin, "quote USER "+config.Hpss.Hpssusername+"\n")
+			io.WriteString(stdin, "quote pass "+config.Hpss.Hpsspassword+"\n")
+			io.WriteString(stdin, "cd "+config.Hpss.Hpssbasedir+"\n")
 			io.WriteString(stdin, "put "+tarfile+" "+path.Base(tarfile)+"\n")
 			io.WriteString(stdin, "bye\n")
 		}()
