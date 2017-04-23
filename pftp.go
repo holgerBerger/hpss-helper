@@ -68,6 +68,10 @@ func (p *Pftp) Put(src string, tgt string) error {
 	return p.sendcmd("put", src+" "+tgt, 1000*time.Second)
 }
 
+func (p *Pftp) Get(src string) error {
+	return p.sendcmd("get", src, 1000*time.Second)
+}
+
 // sendcmd sends a command to pftp and waits for a return code
 // as we are in verbose mode, we get <XYZ > codes back after commands,
 // 1YZ, 2YZ and 3YZ is good, 4YZ and 5YZ is bad.
@@ -138,6 +142,16 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 				}
 			}
 			if cmd == "put" {
+				if strings.Index(string(out), "226 ") != -1 {
+					ch <- nil
+					break
+				}
+				if strings.Index(string(out), "559 ") != -1 {
+					ch <- errors.New("permission problem")
+					break
+				}
+			}
+			if cmd == "get" {
 				if strings.Index(string(out), "226 ") != -1 {
 					ch <- nil
 					break
