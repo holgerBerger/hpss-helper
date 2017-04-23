@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -88,6 +87,8 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 
 	io.WriteString(p.stdin, cmd+" "+args+"\n")
 
+	phase2 := false
+
 	ch := make(chan error)
 	go func() {
 		for {
@@ -153,6 +154,11 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 			}
 			if cmd == "get" {
 				if strings.Index(string(out), "226 ") != -1 {
+					// get first gives 226 and later 200
+					phase2 = true
+				}
+				if phase2 && strings.Index(string(out), "200 ") != -1 {
+					// log.Println("got 200")
 					ch <- nil
 					break
 				}
@@ -175,7 +181,8 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 		return <-ch
 	case <-time.After(timeout):
 		log.Fatal("timeout in hpss communication")
-		os.Exit(1)
+		return errors.New("timeout in hpss")
+		//os.Exit(1)
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ var opts struct {
 	Archive      bool `long:"archive" short:"a" description:"archive directory, -a NAME DIR"`
 	ListArchives bool `long:"listarchives" short:"L" description:"list existing archives"`
 	ListFiles    bool `long:"listfiles" short:"l" description:"list files in archive, -l NAME [PATTERN]"`
+	Extract      bool `long:"extract" short:"e" description:"extract files from archive, -e NAME [PATTERN ...]"`
 	Maxsize      int  `long:"maxsize" short:"s" default:"1" description:"maximum size of fragment in HPSS in GB"`
 	Verbose      bool `long:"verbose" short:"v" description:"show more output"`
 }
@@ -46,6 +47,8 @@ func main() {
 		archivename := args[0]
 		directory := args[1]
 		archive(archivename, directory, opts.Maxsize)
+	} else if opts.Extract {
+		extract(args[0], args[1:])
 	} else if opts.ListArchives {
 		listarchives()
 	} else if opts.ListFiles {
