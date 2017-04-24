@@ -52,6 +52,10 @@ func main() {
 	} else if opts.ListArchives {
 		listarchives()
 	} else if opts.ListFiles {
+		if len(args) < 1 {
+			log.Print("not enough arguments!")
+			os.Exit(1)
+		}
 		if len(args) > 1 {
 			listfiles(args[0], args[1])
 		} else {

@@ -50,7 +50,7 @@ func extract(archive string, patterns []string) {
 		var ok1, ok2 bool
 		for _, pattern := range patterns {
 			ok1, err = path.Match(pattern, path.Base(fields[0]))
-			ok1, err = path.Match(pattern, fields[0])
+			ok2, err = path.Match(pattern, fields[0])
 			if (ok1 || ok2) && err == nil {
 				curbytes, _ := strconv.ParseInt(fields[1], 10, 64)
 				filelist, ok := archiveset[strings.TrimSpace(fields[2])]
@@ -89,7 +89,11 @@ func extract(archive string, patterns []string) {
 	for a, fl := range archiveset {
 		an, _ := strconv.ParseInt(a, 10, 32)
 		tf := fmt.Sprintf("%s-%9.9d.tar", archive, an)
-		getch <- fetchT{tf, fl}
+		if len(patterns) == 1 && patterns[0] == "*" {
+			getch <- fetchT{tf, []string{}}
+		} else {
+			getch <- fetchT{tf, fl}
+		}
 	}
 	runtime.Gosched()
 	close(getch)
@@ -111,9 +115,9 @@ func getWorker(getch chan fetchT, tarch chan fetchT) {
 	pftp := hpsshelper.NewPftp(config.Hpss)
 	pftp.Cd(config.Hpss.Hpssbasedir)
 	for a := range getch {
-		log.Println("  fetching", a.tarname)
+		log.Println(" fetching", a.tarname)
 		pftp.Get(a.tarname)
-		log.Println("  finished fetching", a.tarname)
+		log.Println(" finished fetching", a.tarname)
 		tarch <- a
 	}
 	pftp.Bye()
@@ -124,13 +128,16 @@ func getWorker(getch chan fetchT, tarch chan fetchT) {
 func tarWorker(tarch chan fetchT) {
 	tarWaiter.Add(1)
 	for f := range tarch {
+		log.Println("  extracting from ", config.General.Workdir+"/"+f.tarname)
 		arglist := []string{"-C", CWD, "-xvf", config.General.Workdir + "/" + f.tarname}
 		arglist = append(arglist, f.filelist...)
 		out, err := exec.Command("/bin/tar", arglist...).CombinedOutput()
 		if err != nil {
 			log.Println(string(out))
-			log.Fatal("error while extracting "+f.tarname, err)
+			log.Println("extracting: ", f.filelist)
+			log.Fatal("error while extracting from "+f.tarname, " ", err)
 		}
+		log.Println("  finished extracting from ", config.General.Workdir+"/"+f.tarname)
 	}
 	tarWaiter.Done()
 }

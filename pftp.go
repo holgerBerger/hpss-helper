@@ -143,9 +143,14 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 				}
 			}
 			if cmd == "put" {
-				if strings.Index(string(out), "226 ") != -1 {
+				if strings.Index(string(out), "bytes sent in ") != -1 {
+					log.Print("  ", string(out))
 					ch <- nil
 					break
+				}
+				if strings.Index(string(out), "226 ") != -1 {
+					//ch <- nil
+					//break
 				}
 				if strings.Index(string(out), "559 ") != -1 {
 					ch <- errors.New("permission problem")
@@ -185,6 +190,7 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 	case <-ch:
 		return <-ch
 	case <-time.After(timeout):
+		log.Print(p.Protocoll.String())
 		log.Fatal("timeout in hpss communication")
 		return errors.New("timeout in hpss")
 		//os.Exit(1)

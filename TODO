@@ -1,9 +1,8 @@
 TODO
 
-* Listing
-* Extracting 
 * Reconstructing Cache
 * Purging/Aging Cache
+* supporting workspaces as Workdir, like ws:NAME
 * Compression of metadata cache
 * Router
   implement a way top stage through another host which has access to hpss
@@ -11,6 +10,7 @@ TODO
   access and therefor faster filesystem and network access
   ? Where would the cache be ? 
   ? Would the remote machine check with the cache of the router ?
+
 
 
 IDEAS

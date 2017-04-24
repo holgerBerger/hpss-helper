@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"sync"
 	"time"
 )
@@ -160,8 +161,10 @@ func hpssHandler(hpsschannel chan string) {
 
 	for tarfile := range hpsschannel {
 		if !firstHpsstransferset {
-			firstHpsstransfer = time.Now()
-			firstHpsstransferset = true
+			if strings.Index(tarfile, ".full") == -1 {
+				firstHpsstransfer = time.Now()
+				firstHpsstransferset = true
+			}
 		}
 		log.Print("  sending to hpss ", tarfile)
 
