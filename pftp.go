@@ -96,7 +96,7 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 			out, _ := p.bstdout.ReadBytes('\n')
 
 			str := strings.Replace(string(out), p.hpssconfig.Hpsspassword, "***", -1)
-			// log.Println(str)
+			// log.Println(str) // DEBUG
 			p.Protocoll.WriteString(str)
 
 			if out == nil {
@@ -159,6 +159,11 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 				}
 				if phase2 && strings.Index(string(out), "200 ") != -1 {
 					// log.Println("got 200")
+					ch <- nil
+					break
+				}
+				if strings.Index(string(out), " bytes received ") != -1 {
+					// sometimes there is first 200, then 226, and afterwards this message
 					ch <- nil
 					break
 				}

@@ -6,16 +6,13 @@ package main
 */
 
 import (
-	//	"bufio"
 	"fmt"
 	"github.com/holgerBerger/hpsshelper"
-	//	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path"
-	//	"strconv"
-	//	"strings"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -105,9 +102,14 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 				os.Exit(1)
 			}
 		}
-		fmt.Fprintf(fullcatalogfile, "%s|%d|%d\n", entry.path+"/"+entry.file.Name(),
-			entry.file.Size(), currentarchive)
-		fmt.Fprintln(catalogfile, entry.path+"/"+entry.file.Name())
+		if entry.path[0] == '/' {
+			fmt.Fprintf(fullcatalogfile, "%s|%d|%d\n", path.Clean(entry.path[1:]+"/"+entry.file.Name()),
+				entry.file.Size(), currentarchive)
+		} else {
+			fmt.Fprintf(fullcatalogfile, "%s|%d|%d\n", path.Clean(entry.path+"/"+entry.file.Name()),
+				entry.file.Size(), currentarchive)
+		}
+		fmt.Fprintln(catalogfile, path.Clean(entry.path+"/"+entry.file.Name()))
 		currentsize += entry.file.Size()
 		totalbytes += entry.file.Size()
 	}
@@ -311,6 +313,7 @@ func archive(archivename string, directory string, maxsize int) {
 	go fileHandler(archivename, int64(maxsize)*1024*1024*1024, process)
 	log.Print("scanning files")
 	walk(directory, process)
+	runtime.Gosched()
 	close(process)
 	log.Print("finished scanning")
 

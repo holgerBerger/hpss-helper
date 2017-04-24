@@ -6,7 +6,9 @@ import (
 	"github.com/holgerBerger/hpsshelper"
 	"log"
 	"os"
+	"os/exec"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,7 +21,10 @@ type fetchT struct {
 	filelist []string
 }
 
+var CWD string
+
 func extract(archive string, patterns []string) {
+	CWD, _ = os.Getwd()
 	archiveset := make(map[string][]string)
 	file, err := os.Open(config.General.Cachedir + "/" + archive + ".full")
 	if err != nil {
@@ -52,7 +57,7 @@ func extract(archive string, patterns []string) {
 					filelist = append(filelist, string(fields[0]))
 					archiveset[strings.TrimSpace(fields[2])] = filelist
 				} else {
-					filelist := make([]string, 128)
+					filelist := make([]string, 0, 128)
 					filelist = append(filelist, fields[0])
 					archiveset[strings.TrimSpace(fields[2])] = filelist
 				}
@@ -67,9 +72,17 @@ func extract(archive string, patterns []string) {
 
 	fetchWaiter.Add(1)
 	getch := make(chan fetchT, 128)
+	tarWaiter.Add(1)
+	tarch := make(chan fetchT, 128)
 
+	// spawn tar workers
+	for i := 0; i < config.General.Tars; i++ {
+		go tarWorker(tarch)
+	}
+
+	// spawn movers
 	for i := 0; i < config.General.Hpssmovers; i++ {
-		go getworker(getch)
+		go getWorker(getch, tarch)
 	}
 
 	for a, fl := range archiveset {
@@ -77,14 +90,20 @@ func extract(archive string, patterns []string) {
 		tf := fmt.Sprintf("%s-%9.9d.tar", archive, an)
 		getch <- fetchT{tf, fl}
 	}
+	runtime.Gosched()
 	close(getch)
 	fetchWaiter.Done()
 	log.Println("waiting for HPSS")
 	fetchWaiter.Wait()
 	log.Println("finished waiting for HPSS")
+	tarWaiter.Done()
+	close(tarch)
+	log.Println("waiting for tar")
+	tarWaiter.Wait()
+	log.Println("finished waiting for tar")
 }
 
-func getworker(getch chan fetchT) {
+func getWorker(getch chan fetchT, tarch chan fetchT) {
 	fetchWaiter.Add(1)
 	cwd, _ := os.Getwd()
 	os.Chdir(config.General.Workdir)
@@ -94,9 +113,23 @@ func getworker(getch chan fetchT) {
 		log.Println("  fetching", a.tarname)
 		pftp.Get(a.tarname)
 		log.Println("  finished fetching", a.tarname)
-		log.Println("  extracting", a.filelist)
+		tarch <- a
 	}
 	pftp.Bye()
 	os.Chdir(cwd)
 	fetchWaiter.Done()
+}
+
+func tarWorker(tarch chan fetchT) {
+	tarWaiter.Add(1)
+	for f := range tarch {
+		arglist := []string{"-C", CWD, "-xvf", config.General.Workdir + "/" + f.tarname}
+		arglist = append(arglist, f.filelist...)
+		out, err := exec.Command("/bin/tar", arglist...).CombinedOutput()
+		if err != nil {
+			log.Println(string(out))
+			log.Fatal("error while extracting "+f.tarname, err)
+		}
+	}
+	tarWaiter.Done()
 }
