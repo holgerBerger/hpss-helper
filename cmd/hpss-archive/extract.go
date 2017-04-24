@@ -47,10 +47,11 @@ func extract(archive string, patterns []string) {
 			break
 		}
 		fields := strings.Split(string(line), "|")
-		var ok bool
+		var ok1, ok2 bool
 		for _, pattern := range patterns {
-			ok, err = path.Match(pattern, path.Base(fields[0]))
-			if ok && err == nil {
+			ok1, err = path.Match(pattern, path.Base(fields[0]))
+			ok1, err = path.Match(pattern, fields[0])
+			if (ok1 || ok2) && err == nil {
 				curbytes, _ := strconv.ParseInt(fields[1], 10, 64)
 				filelist, ok := archiveset[strings.TrimSpace(fields[2])]
 				if ok {
@@ -66,7 +67,7 @@ func extract(archive string, patterns []string) {
 			}
 		}
 	}
-	log.Println("fetching", bytes/(1204*1024), "MB in", files,
+	log.Println("fetching", bytes/(1024.0*1024.0), "MB in", files,
 		"files kept in total of", len(archiveset), "archive fragments")
 	file.Close()
 

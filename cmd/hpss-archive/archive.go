@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -75,13 +74,13 @@ func fileHandler(archive string, maxsize int64, process chan dirEntry) {
 
 	// spawn hpps movers
 	hpsschannel = make(chan string, 1024)
-	for i := 1; i < config.General.Hpssmovers; i++ {
+	for i := 0; i < config.General.Hpssmovers; i++ {
 		go hpssHandler(hpsschannel)
 	}
 
 	// spawn tar processes
 	tarchannel := make(chan tarFile, 1024)
-	for i := 1; i < config.General.Tars; i++ {
+	for i := 0; i < config.General.Tars; i++ {
 		go tarHandler(tarchannel, hpsschannel)
 	}
 
@@ -311,12 +310,12 @@ func archive(archivename string, directory string, maxsize int) {
 	// traverse tree
 	process := make(chan dirEntry, 10)
 	go fileHandler(archivename, int64(maxsize)*1024*1024*1024, process)
+	tarWaiter.Add(1)
 	log.Print("scanning files")
 	walk(directory, process)
-	runtime.Gosched()
 	close(process)
 	log.Print("finished scanning")
-
+	tarWaiter.Done()
 	log.Print("waiting for tar")
 	tarWaiter.Wait()
 	log.Print("finished waiting for tar")
