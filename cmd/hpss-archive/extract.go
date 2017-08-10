@@ -52,7 +52,7 @@ func extract(archive string, patterns []string) {
 			ok1, err = path.Match(pattern, path.Base(fields[0]))
 			ok2, err = path.Match(pattern, fields[0])
 			if (ok1 || ok2) && err == nil {
-				curbytes, _ := strconv.ParseInt(fields[1], 10, 64)
+				curbytes, _ := strconv.ParseInt(fields[1], 10, 64)  
 				filelist, ok := archiveset[strings.TrimSpace(fields[2])]
 				if ok {
 					filelist = append(filelist, string(fields[0]))

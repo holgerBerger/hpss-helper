@@ -41,12 +41,12 @@ func NewPftp(hpssconfig HpssConfigT) *Pftp {
 
 	pftp.cmd.Start()
 
-	err = pftp.sendcmd("quote USER", pftp.hpssconfig.Hpssusername, 10*time.Second)
+	err = pftp.sendcmd("quote USER", pftp.hpssconfig.Hpssusername, 10*time.Second, nil)
 	if err != nil {
 		log.Fatal(err)
 		return nil
 	}
-	err = pftp.sendcmd("quote pass", pftp.hpssconfig.Hpsspassword, 10*time.Second)
+	err = pftp.sendcmd("quote pass", pftp.hpssconfig.Hpsspassword, 10*time.Second, nil)
 	if err != nil {
 		log.Fatal(err)
 		return nil
@@ -56,19 +56,25 @@ func NewPftp(hpssconfig HpssConfigT) *Pftp {
 }
 
 func (p *Pftp) Bye() error {
-	return p.sendcmd("bye", "", 1*time.Second)
+	return p.sendcmd("bye", "", 1*time.Second, nil)
 }
 
 func (p *Pftp) Cd(dir string) error {
-	return p.sendcmd("cd", dir, 1*time.Second)
+	return p.sendcmd("cd", dir, 1*time.Second, nil)
+}
+
+func (p *Pftp) Ls(pattern string) (error, string) {
+	var outstring string
+	err := p.sendcmd("ls", pattern, 1*time.Second, &outstring)
+	return err, outstring
 }
 
 func (p *Pftp) Put(src string, tgt string) error {
-	return p.sendcmd("put", src+" "+tgt, 1000*time.Second)
+	return p.sendcmd("put", src+" "+tgt, 1000*time.Second, nil)
 }
 
 func (p *Pftp) Get(src string) error {
-	return p.sendcmd("get", src, 1000*time.Second)
+	return p.sendcmd("get", src, 1000*time.Second, nil)
 }
 
 // sendcmd sends a command to pftp and waits for a return code
@@ -83,7 +89,7 @@ func (p *Pftp) Get(src string) error {
 //   226 transfer complete
 //   250 CWD success
 //   550 no such file
-func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
+func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration, outstr *string) error {
 
 	io.WriteString(p.stdin, cmd+" "+args+"\n")
 
@@ -112,6 +118,23 @@ func (p *Pftp) sendcmd(cmd string, args string, timeout time.Duration) error {
 				if strings.Index(string(out), "550 ") != -1 {
 					ch <- errors.New("No such file or directory")
 					break
+				}
+			}
+			if cmd == "ls" {
+
+				if strings.Index(string(out), "226 Transfer") != -1 {
+					ch <- nil
+					break
+				}
+				if strings.Index(string(out), "550 No") != -1 {
+					ch <- errors.New("no such file")
+					break
+				}
+				if phase2 && outstr != nil {
+					*outstr = *outstr + string(out)
+				}
+				if strings.Index(string(out), "150 Opening") != -1 {
+					phase2 = true
 				}
 			}
 			if cmd == "quote USER" {

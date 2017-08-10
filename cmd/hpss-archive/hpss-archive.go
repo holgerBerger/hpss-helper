@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/BurntSushi/toml"
-	flags "github.com/jessevdk/go-flags"
 	"log"
 	"os"
+
+	"github.com/BurntSushi/toml"
+	flags "github.com/jessevdk/go-flags"
 )
 
 var opts struct {
@@ -12,6 +13,7 @@ var opts struct {
 	ListArchives bool `long:"listarchives" short:"L" description:"list existing archives"`
 	ListFiles    bool `long:"listfiles" short:"l" description:"list files in archive, -l NAME [PATTERN]"`
 	Extract      bool `long:"extract" short:"e" description:"extract files from archive, -e NAME [PATTERN ...]"`
+	Refresh      bool `long:"refresh" short:"r" description:"refresh local cache from server"`
 	Maxsize      int  `long:"maxsize" short:"s" default:"1" description:"maximum size of fragment in HPSS in GB"`
 	Verbose      bool `long:"verbose" short:"v" description:"show more output"`
 }
@@ -61,6 +63,8 @@ func main() {
 		} else {
 			listfiles(args[0], "")
 		}
+	} else if opts.Refresh {
+		refresh()
 	} else {
 		log.Println("try hpss-archive -h for help")
 	}

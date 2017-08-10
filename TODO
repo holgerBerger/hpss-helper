@@ -1,14 +1,13 @@
 TODO
 
-* Reconstructing Cache
 * Purging/Aging Cache
 * supporting workspaces as Workdir, like ws:NAME
 * Compression of metadata cache
 * Router
-  implement a way top stage through another host which has access to hpss
+  implement a way to stage through another host which has access to hpss
   Having a flag that signals access to same filesystem could also allow parallel
   access and therefor faster filesystem and network access
-  ? Where would the cache be ? 
+  ? Where would the cache be ?
   ? Would the remote machine check with the cache of the router ?
 
 
@@ -20,6 +19,6 @@ IDEAS
   indexing tars and having own tar would allow for random access with tar archives,
   which allows even faster extraction
 * support other formats, pfa/fpa?
-* using the infrastructure for moving unchanged files, so not creating archives and cutting 
+* using the infrastructure for moving unchanged files, so not creating archives and cutting
   in chunks, but just moving the data between several filesystems and hpss
   this makes sense if tooling and GUI are offering advantages, or if transfer is faster
