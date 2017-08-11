@@ -3,7 +3,6 @@ package main
 import (
 	//"fmt"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -11,13 +10,16 @@ import (
 )
 
 var (
-	startdir         string
-	activeview       int = 0
-	currentdir       string
-	currentselection int = 0
-	currentfsorigin  int = 0
-	fsselection          = make(map[int]bool)
-	logview          *gocui.View
+	startdir           string
+	activeview         int
+	currentdir         string
+	currentfsselection int
+	currentfsorigin    int
+	fsselection        = make(map[int]bool)
+	currentfiles       []os.FileInfo
+	fsview             *gocui.View
+	hpssview           *gocui.View
+	logview            *gocui.View
 )
 
 func setCurrentViewOnTop(g *gocui.Gui, name string) (*gocui.View, error) {
@@ -31,6 +33,7 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
 }
 
+// switch between views on <TAB>
 func nextView(g *gocui.Gui, v *gocui.View) error {
 	if activeview == 0 {
 		activeview = 1
@@ -46,145 +49,38 @@ func nextView(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func CursorUp(g *gocui.Gui, v *gocui.View) error {
-	if currentselection > 0 {
-		currentselection--
-	}
-	//_, y := v.Size()
-	if currentselection < currentfsorigin {
-		currentfsorigin--
-		v.SetOrigin(0, currentfsorigin)
-	}
-	v.Clear()
-	v.Rewind()
-	fillFs(v)
-	return nil
-}
-
-func CursorDown(g *gocui.Gui, v *gocui.View) error {
-	currentselection++
-	_, y := v.Size()
-	if currentselection >= currentfsorigin+y {
-		currentfsorigin++
-		v.SetOrigin(0, currentfsorigin)
-	}
-	v.Clear()
-	v.Rewind()
-	fillFs(v)
-	return nil
-}
-
-func Enter(g *gocui.Gui, v *gocui.View) error {
-	if v.Name() == "fs" {
-		line, _ := v.Line(currentselection)
-		newdir := line[2:]
-		err := os.Chdir(newdir)
-		if err != nil {
-			fmt.Fprintln(logview, "can not change directory, permission denied")
-			return nil
-		}
-		currentdir, _ = os.Getwd()
-		fsselection = make(map[int]bool)
-		currentselection = 0
-		v.Clear()
-		v.Rewind()
-		fillFs(v)
-	}
-	return nil
-}
-
-func Select(g *gocui.Gui, v *gocui.View) error {
-	if v.Name() == "fs" {
-		line, _ := v.Line(currentselection)
-		if line[2:] == ".." {
-			// ignore
-		} else {
-			if fsselection[currentselection] {
-				fsselection[currentselection] = false
-			} else {
-				fsselection[currentselection] = true
-			}
-			v.Clear()
-			v.Rewind()
-			fillFs(v)
-		}
-	}
-	return nil
-}
-
-func Home(g *gocui.Gui, v *gocui.View) error {
-	os.Chdir(startdir)
-	currentdir, _ = os.Getwd()
-	fsselection = make(map[int]bool)
-	currentselection = 0
-	v.Clear()
-	v.Rewind()
-	fillFs(v)
-	return nil
-}
-
-func Help(g *gocui.Gui, v *gocui.View) error {
+// print some help to log view
+func help(g *gocui.Gui, v *gocui.View) error {
 	fmt.Fprintln(logview, "cursur up/down to move cursor, <Home> to go to start directory")
 	fmt.Fprintln(logview, "<intert> or <space> to toggle a file/directory selection")
 	fmt.Fprintln(logview, "<enter> to change directory")
 	fmt.Fprintln(logview, "<tab> to change between filesystem and hpss")
+	fmt.Fprintln(logview, "<ctrl-c> to exit")
+	fmt.Fprintln(logview, "F2 archive marked files/directories")
+	fmt.Fprintln(logview, "F3 retrieve marked files/directories")
 	return nil
 }
 
-func fillFs(v *gocui.View) {
-	// TODO chache ReadDir
-	v.Title = "filesystem " + currentdir
-	files, err := ioutil.ReadDir(currentdir)
-	if err != nil {
-		panic(err)
-	}
-
-	// cursor
-	currentline := 0
-	if currentline == currentselection {
-		fmt.Fprint(v, "\x1b[0;30;47m>")
-	} else {
-		fmt.Fprint(v, " ")
-	}
-	// selection marker
-	if fsselection[currentline] {
-		fmt.Fprint(v, "\x1b[0;33;47m+")
-	} else {
-		fmt.Fprint(v, " ")
-	}
-	// entry .. as dir
-	fmt.Fprintln(v, "\x1b[0;32m..")
-	currentline++
-
-	for _, f := range files {
-		// cursor
-		if currentline == currentselection {
-			fmt.Fprint(v, "\x1b[0;30;47m>")
-		} else {
-			fmt.Fprint(v, " ")
+// move files to archive
+func archive(g *gocui.Gui, v *gocui.View) error {
+	fmt.Fprint(logview, "archive files: ")
+	for i, file := range currentfiles {
+		if fsselection[i+1] {
+			fmt.Fprint(logview, file.Name()+" ")
 		}
-		// selection marker
-		if fsselection[currentline] {
-			fmt.Fprint(v, "\x1b[0;34;47m+")
-		} else {
-			fmt.Fprint(v, " ")
-		}
-		// entry
-		if f.IsDir() {
-			fmt.Fprintln(v, "\x1b[0;32m"+f.Name())
-		} else {
-			fmt.Fprintln(v, "\x1b[0;30;47m"+f.Name())
-		}
-		currentline++
 	}
+	fmt.Fprintln(logview, "")
+	return nil
 }
 
+// create the views
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 	if v, err := g.SetView("fs", 0, 0, maxX/2-1, maxY-10); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
+		fsview = v
 		v.Title = "filesystem"
 		v.Wrap = false
 		v.Autoscroll = false
@@ -200,6 +96,7 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
+		hpssview = v
 		v.Title = "HPSS archive"
 		v.Wrap = false
 		v.Autoscroll = false
@@ -242,7 +139,7 @@ func main() {
 	// init windows
 	g.SetManagerFunc(layout)
 
-	// keyboard bindings
+	// keyboard bindings for all views
 	// quit
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		log.Panicln(err)
@@ -251,34 +148,16 @@ func main() {
 	if err := g.SetKeybinding("", gocui.KeyTab, gocui.ModNone, nextView); err != nil {
 		log.Panicln(err)
 	}
-	// cursor up
-	if err := g.SetKeybinding("", gocui.KeyArrowUp, gocui.ModNone, CursorUp); err != nil {
-		log.Panicln(err)
-	}
-	// cursor down
-	if err := g.SetKeybinding("", gocui.KeyArrowDown, gocui.ModNone, CursorDown); err != nil {
-		log.Panicln(err)
-	}
-	// Enter = chdir
-	if err := g.SetKeybinding("", gocui.KeyEnter, gocui.ModNone, Enter); err != nil {
-		log.Panicln(err)
-	}
-	// CtrlEnter = select
-	if err := g.SetKeybinding("", gocui.KeyInsert, gocui.ModNone, Select); err != nil {
-		log.Panicln(err)
-	}
-	// Space = select
-	if err := g.SetKeybinding("", gocui.KeySpace, gocui.ModNone, Select); err != nil {
-		log.Panicln(err)
-	}
-	// Home
-	if err := g.SetKeybinding("", gocui.KeyHome, gocui.ModNone, Home); err != nil {
-		log.Panicln(err)
-	}
 	// F1
-	if err := g.SetKeybinding("", gocui.KeyF1, gocui.ModNone, Help); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyF1, gocui.ModNone, help); err != nil {
 		log.Panicln(err)
 	}
+	// F2
+	if err := g.SetKeybinding("", gocui.KeyF2, gocui.ModNone, archive); err != nil {
+		log.Panicln(err)
+	}
+
+	fsviewkeybindings(g)
 
 	// mainloop
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
