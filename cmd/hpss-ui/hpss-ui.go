@@ -6,8 +6,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/BurntSushi/toml"
 	"github.com/jroimartin/gocui"
 )
+
+var config configT
 
 var (
 	startdir           string
@@ -54,7 +57,7 @@ func help(g *gocui.Gui, v *gocui.View) error {
 	fmt.Fprintln(logview, "cursur up/down to move cursor, <Home> to go to start directory")
 	fmt.Fprintln(logview, "<intert> or <space> to toggle a file/directory selection")
 	fmt.Fprintln(logview, "<enter> to change directory")
-	fmt.Fprintln(logview, "<tab> to change between filesystem and hpss")
+	fmt.Fprint(logview, "<tab> to change between filesystem and hpss, ")
 	fmt.Fprintln(logview, "<ctrl-c> to exit")
 	fmt.Fprintln(logview, "F2 archive marked files/directories")
 	fmt.Fprintln(logview, "F3 retrieve marked files/directories")
@@ -100,6 +103,8 @@ func layout(g *gocui.Gui) error {
 		v.Title = "HPSS archive"
 		v.Wrap = false
 		v.Autoscroll = false
+
+		fillHpss(v)
 	}
 
 	if v, err := g.SetView("log", 0, maxY-9, maxX-1, maxY-1); err != nil {
@@ -110,6 +115,7 @@ func layout(g *gocui.Gui) error {
 		v.Title = "log"
 		v.Wrap = true
 		v.Autoscroll = true
+		// v.Editable = true
 		fmt.Fprintln(v, "F1 for help")
 	}
 
@@ -118,6 +124,12 @@ func layout(g *gocui.Gui) error {
 
 func main() {
 	startdir, _ = os.Getwd()
+
+	// read config
+	if _, err := toml.DecodeFile(os.ExpandEnv("${HOME}/.hpsshelper.conf"), &config); err != nil {
+		log.Print("error in reading $HOME/.hpsshelper.conf")
+		log.Fatal(err)
+	}
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
