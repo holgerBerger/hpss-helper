@@ -170,6 +170,7 @@ func main() {
 	}
 
 	fsviewkeybindings(g)
+	hpssviewkeybindings(g)
 
 	// mainloop
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {

@@ -7,9 +7,10 @@ import (
 	"os"
 
 	"github.com/jroimartin/gocui"
+	"github.com/nsf/termbox-go"
 )
 
-// mode cursor up and scroll if necessary
+// move cursor up and scroll if necessary
 func fsCursorUp(g *gocui.Gui, v *gocui.View) error {
 	if currentfsselection > 0 {
 		currentfsselection--
@@ -124,11 +125,19 @@ func fsviewkeybindings(g *gocui.Gui) {
 	if err := g.SetKeybinding("fs", gocui.KeyHome, gocui.ModNone, fsHome); err != nil {
 		log.Panicln(err)
 	}
+
+	if err := g.SetKeybinding("", gocui.KeyCtrlL, gocui.ModNone,
+		func(g *gocui.Gui, v *gocui.View) error {
+			return termbox.Sync()
+		}); err != nil {
+		// TODO: handle the error
+	}
+
 }
 
 // populate fs view
 func fillFs(v *gocui.View) {
-	// TODO chache ReadDir
+
 	v.Title = "filesystem " + currentdir
 
 	if len(currentfiles) == 0 {
