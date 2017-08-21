@@ -104,9 +104,10 @@ func readArchiveCache() {
 
 func getFolderContens() {
 	shown := make(map[string]bool)
+  hpssfolderlines=make([]string, 0,0 )
 
 	for _, line := range hpsslines {
-		if line[:len(hpssviewprefix)] == hpssviewprefix {
+		if (len(hpssviewprefix)<=len(line)) && (line[:len(hpssviewprefix)] == hpssviewprefix) {
 			dir := line[len(hpssviewprefix):] // prefix removed
 			entry := strings.Split(dir, "/")[0]
 			if _, ok := shown[entry]; ok {
@@ -131,6 +132,17 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 		v.Rewind()
 		fillHpss(v)
 	} else {
+		line, _ := v.Line(currenthpssselection)
+		fmt.Fprintln(logview, "selected "+line )
+		hpssviewprefix = hpssviewprefix + line[1:]+"/"
+		fmt.Fprintln(logview, hpssviewprefix)
+		currenthpssselection = 0
+		currenthpssorigin = 0
+		getFolderContens()
+		v.Clear()
+		v.Rewind()
+		fillHpss(v)
+
 		/*
 			line, _ := v.Line(currentfsselection)
 			newdir := line[2:]
