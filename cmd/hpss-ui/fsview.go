@@ -68,6 +68,7 @@ func fsEnter(g *gocui.Gui, v *gocui.View) error {
 
 // select or deselect entry
 func fsSelect(g *gocui.Gui, v *gocui.View) error {
+	// FIXME if looks unnecessary
 	if v.Name() == "fs" {
 		line, _ := v.Line(currentfsselection)
 		if line[2:] == ".." {

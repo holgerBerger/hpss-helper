@@ -11,13 +11,14 @@ import (
 )
 
 type hpssT struct {
-	toplevel       bool     // true if on top level = view of archive names
-	currentarchive string   // name of current archive
-	cursorline     int      // line with cursorline
-	origin         int      // top line of displayed
-	prefix         string   // commom prefix part of path which is not displayed
-	lines          []string // lines of file
-	folderlines    []string // content of current folder to display
+	toplevel       bool         // true if on top level = view of archive names
+	currentarchive string       // name of current archive
+	cursorline     int          // line with cursorline
+	origin         int          // top line of displayed
+	prefix         string       // commom prefix part of path which is not displayed
+	lines          []string     // lines of file
+	folderlines    []string     // content of current folder to display
+	selection      map[int]bool // selected items
 }
 
 var hpss hpssT
@@ -53,12 +54,24 @@ func fillHpss(v *gocui.View) {
 		} else {
 			fmt.Fprint(v, " ")
 		}
+		// selection marker
+		if hpss.selection[currentline] {
+			fmt.Fprint(v, "\x1b[0;33;47m+")
+		} else {
+			fmt.Fprint(v, " ")
+		}
 		fmt.Fprintln(v, "\x1b[0;32m..")
 		currentline++
 		// entries
 		for _, i := range hpss.folderlines {
 			if hpss.cursorline == currentline {
 				fmt.Fprint(v, "\x1b[0;30;47m>")
+			} else {
+				fmt.Fprint(v, " ")
+			}
+			// selection marker
+			if hpss.selection[currentline] {
+				fmt.Fprint(v, "\x1b[0;34;47m+")
 			} else {
 				fmt.Fprint(v, " ")
 			}
@@ -153,7 +166,7 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 	} else {
 		line, _ := v.Line(hpss.cursorline)
 		fmt.Fprintln(logview, "selected "+line)
-		if line[1:] == ".." { // going up
+		if line[2:] == ".." { // going up
 			fmt.Fprintln(logview, "to split: "+hpss.prefix)
 			splitted := strings.Split(hpss.prefix, "/")
 			fmt.Fprintln(logview, splitted, len(splitted))
@@ -166,7 +179,11 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 				hpss.prefix = strings.Join(splitted[:len(splitted)-2], "/") + "/"
 			}
 		} else { // going down
-			hpss.prefix = hpss.prefix + line[1:] + "/"
+			if strings.Contains(line[2:], "|") {
+				// ignore, not directory
+			} else {
+				hpss.prefix = hpss.prefix + line[2:] + "/"
+			}
 		}
 		fmt.Fprintln(logview, "prefix: "+hpss.prefix)
 		hpss.cursorline = 0
@@ -179,9 +196,28 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func hpssSelect(g *gocui.Gui, v *gocui.View) error {
+	line, _ := v.Line(hpss.cursorline)
+	if line[2:] == ".." {
+		// ignore
+	} else {
+		if hpss.selection[hpss.cursorline] {
+			 hpss.selection[hpss.cursorline]= false
+		} else {
+			hpss.selection[hpss.cursorline] = true
+		}
+		v.Clear()
+		v.Rewind()
+		fillHpss(v)
+	}
+	return nil
+}
+
 // create key bindings for fs viewer
 func hpssviewkeybindings(g *gocui.Gui) {
 	hpss.toplevel = true
+	hpss.selection = make(map[int]bool)
+
 	// cursor up
 	if err := g.SetKeybinding("hpss", gocui.KeyArrowUp, gocui.ModNone, hpssCursorUp); err != nil {
 		log.Panicln(err)
@@ -195,15 +231,16 @@ func hpssviewkeybindings(g *gocui.Gui) {
 	if err := g.SetKeybinding("hpss", gocui.KeyEnter, gocui.ModNone, hpssEnter); err != nil {
 		log.Panicln(err)
 	}
+
+	// CtrlEnter = select
+	if err := g.SetKeybinding("hpss", gocui.KeyInsert, gocui.ModNone, hpssSelect); err != nil {
+		log.Panicln(err)
+	}
+	// Space = select
+	if err := g.SetKeybinding("hpss", gocui.KeySpace, gocui.ModNone, hpssSelect); err != nil {
+		log.Panicln(err)
+	}
 	/*
-		// CtrlEnter = select
-		if err := g.SetKeybinding("fs", gocui.KeyInsert, gocui.ModNone, hpssSelect); err != nil {
-			log.Panicln(err)
-		}
-		// Space = select
-		if err := g.SetKeybinding("fs", gocui.KeySpace, gocui.ModNone, hpssSelect); err != nil {
-			log.Panicln(err)
-		}
 		// Home
 		if err := g.SetKeybinding("fs", gocui.KeyHome, gocui.ModNone, hpssHome); err != nil {
 			log.Panicln(err)
