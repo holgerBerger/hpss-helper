@@ -52,10 +52,17 @@ func nextView(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func switch2log(g *gocui.Gui, v *gocui.View) error {
+	if _, err := setCurrentViewOnTop(g, "log"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // print some help to log view
 func help(g *gocui.Gui, v *gocui.View) error {
 	fmt.Fprintln(logview, "cursur up/down to move cursor, <Home> to go to start directory")
-	fmt.Fprintln(logview, "<intert> or <space> to toggle a file/directory selection")
+	fmt.Fprintln(logview, "<insert> or <space> to toggle a file/directory selection")
 	fmt.Fprintln(logview, "<enter> to change directory")
 	fmt.Fprint(logview, "<tab> to change between filesystem and hpss, ")
 	fmt.Fprintln(logview, "<ctrl-c> to exit")
@@ -70,6 +77,18 @@ func archive(g *gocui.Gui, v *gocui.View) error {
 	for i, file := range currentfiles {
 		if fsselection[i+1] {
 			fmt.Fprint(logview, file.Name()+" ")
+		}
+	}
+	fmt.Fprintln(logview, "")
+	return nil
+}
+
+// fetch files from archive
+func retrieve(g *gocui.Gui, v *gocui.View) error {
+	fmt.Fprint(logview, "retrieve files: ")
+	for i, file := range hpss.folderlines {
+		if hpss.selection[i+1] {
+			fmt.Fprint(logview, hpss.prefix+file.name+" ")
 		}
 	}
 	fmt.Fprintln(logview, "")
@@ -115,7 +134,7 @@ func layout(g *gocui.Gui) error {
 		v.Title = "log"
 		v.Wrap = true
 		v.Autoscroll = true
-		// v.Editable = true
+		v.Editable = true
 		fmt.Fprintln(v, "F1 for help")
 	}
 
@@ -168,7 +187,14 @@ func main() {
 	if err := g.SetKeybinding("", gocui.KeyF2, gocui.ModNone, archive); err != nil {
 		log.Panicln(err)
 	}
-
+	// F3
+	if err := g.SetKeybinding("", gocui.KeyF3, gocui.ModNone, retrieve); err != nil {
+		log.Panicln(err)
+	}
+	// F10
+	if err := g.SetKeybinding("", gocui.KeyF10, gocui.ModNone, switch2log); err != nil {
+		log.Panicln(err)
+	}
 	fsviewkeybindings(g)
 	hpssviewkeybindings(g)
 

@@ -17,8 +17,13 @@ type hpssT struct {
 	origin         int          // top line of displayed
 	prefix         string       // commom prefix part of path which is not displayed
 	lines          []string     // lines of file
-	folderlines    []string     // content of current folder to display
+	folderlines    []entryT     // content of current folder to display
 	selection      map[int]bool // selected items
+}
+
+type entryT struct {
+	name string
+	dir  bool
 }
 
 var hpss hpssT
@@ -75,10 +80,10 @@ func fillHpss(v *gocui.View) {
 			} else {
 				fmt.Fprint(v, " ")
 			}
-			if strings.Contains(i, "|") {
-				fmt.Fprintln(hpssview, "\x1b[0;30;47m"+i)
+			if !i.dir {
+				fmt.Fprintln(hpssview, "\x1b[0;30;47m"+i.name)
 			} else {
-				fmt.Fprintln(hpssview, "\x1b[0;32m"+i)
+				fmt.Fprintln(hpssview, "\x1b[0;32m"+i.name)
 			}
 			currentline++
 		}
@@ -112,7 +117,7 @@ func hpssCursorDown(g *gocui.Gui, v *gocui.View) error {
 
 	_, y := v.Size()
 	if hpss.cursorline >= hpss.origin+y {
-		hpss.cursorline++
+		hpss.origin++
 		v.SetOrigin(0, hpss.origin)
 	}
 	v.Clear()
@@ -136,23 +141,28 @@ func readArchiveCache() {
 // filter current folder from hpss.lines by showing lines with common prefix
 func getFolderContens() {
 	shown := make(map[string]bool)
-	hpss.folderlines = make([]string, 0, 0)
+	hpss.folderlines = make([]entryT, 0, 0)
 
 	for _, line := range hpss.lines {
 		if (len(hpss.prefix) <= len(line)) && (line[:len(hpss.prefix)] == hpss.prefix) {
 			dir := line[len(hpss.prefix):] // prefix removed
-			entry := strings.Split(dir, "/")[0]
+			entry := strings.Split(strings.Split(dir, "/")[0], "|")[0]
 			if _, ok := shown[entry]; ok {
 				// already displayed, skip
+				// fmt.Fprintln(logview, "skip:"+dir)
+				// FIXME this assumes that current entry is same as last entry,
+				// so it assumes a sorting of the files
+				hpss.folderlines[len(hpss.folderlines)-1].dir = true
 			} else {
+				// fmt.Fprintln(logview, "use:"+dir)
 				shown[entry] = true
-				hpss.folderlines = append(hpss.folderlines, entry)
+				hpss.folderlines = append(hpss.folderlines, entryT{entry, false})
 			}
 		}
 	}
 }
 
-// chamge mode if on top level or change directory
+// change mode if on top level or change directory
 func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 	if hpss.toplevel {
 		hpss.toplevel = false
@@ -165,11 +175,11 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 		fillHpss(v)
 	} else {
 		line, _ := v.Line(hpss.cursorline)
-		fmt.Fprintln(logview, "selected "+line)
+		// fmt.Fprintln(logview, "selected "+line)
 		if line[2:] == ".." { // going up
-			fmt.Fprintln(logview, "to split: "+hpss.prefix)
+			// fmt.Fprintln(logview, "to split: "+hpss.prefix)
 			splitted := strings.Split(hpss.prefix, "/")
-			fmt.Fprintln(logview, splitted, len(splitted))
+			// fmt.Fprintln(logview, splitted, len(splitted))
 			if len(splitted) <= 1 { // top level
 				hpss.toplevel = true
 				hpss.prefix = ""
@@ -185,7 +195,7 @@ func hpssEnter(g *gocui.Gui, v *gocui.View) error {
 				hpss.prefix = hpss.prefix + line[2:] + "/"
 			}
 		}
-		fmt.Fprintln(logview, "prefix: "+hpss.prefix)
+		// fmt.Fprintln(logview, "prefix: "+hpss.prefix)
 		hpss.cursorline = 0
 		hpss.origin = 0
 		getFolderContens()
@@ -202,7 +212,7 @@ func hpssSelect(g *gocui.Gui, v *gocui.View) error {
 		// ignore
 	} else {
 		if hpss.selection[hpss.cursorline] {
-			 hpss.selection[hpss.cursorline]= false
+			hpss.selection[hpss.cursorline] = false
 		} else {
 			hpss.selection[hpss.cursorline] = true
 		}
