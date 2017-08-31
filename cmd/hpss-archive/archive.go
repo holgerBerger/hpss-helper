@@ -308,14 +308,17 @@ func hpssHandler1(hpsschannel chan string) {
 */
 
 // archive a directory tree into a number of archives
-func archive(archivename string, directory string, maxsize int) {
+func archive(archivename string, directory []string, maxsize int) {
 	start := time.Now()
 	// traverse tree
 	process := make(chan dirEntry, 10)
 	go fileHandler(archivename, int64(maxsize)*1024*1024*1024, process)
 	tarWaiter.Add(1)
 	log.Print("scanning files")
-	walk(directory, process)
+	// FIXME this does only directories, not files in top level!
+	for _, dir := range directory {
+		walk(dir, process)
+	}
 	close(process)
 	log.Print("finished scanning")
 	tarWaiter.Done()

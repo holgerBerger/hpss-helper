@@ -47,7 +47,7 @@ func main() {
 			os.Exit(1)
 		}
 		archivename := args[0]
-		directory := args[1]
+		directory := args[1:]
 		archive(archivename, directory, opts.Maxsize)
 	} else if opts.Extract {
 		extract(args[0], args[1:])
